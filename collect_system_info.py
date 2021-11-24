@@ -20,19 +20,14 @@ import os
 import sqlite3
 import time
 from datetime import datetime
-from functools import wraps
 
 import numpy as np
 import pandas as pd
 import psutil
 import pynvml
 
-# 全局环境与参数初始化
-COLLECT_SYS_INFO_EVERY_K_SECONDS = 7
-DATABASE_DIR = 'system_logs_database'
-DATABASE_NAME = 'sys_resource_usage_logs.db'
-TABLE_NAME = 'sys_resource_logs_table'
-
+from config import Configs
+from utils.io_utils import timefn
 
 def add_prefix(info_dict, prefix=None):
     '''为字典key添加标识符'''
@@ -46,33 +41,6 @@ def add_prefix(info_dict, prefix=None):
         tmp_dict['{}_{}'.format(prefix, key)] = info_dict[key]
 
     return tmp_dict
-
-
-def check_datetime_format(datetime_str):
-    '''检查时间字符串是否合法'''
-    if not isinstance(datetime_str, str):
-        raise ValueError('Invalid input datetime type !')
-
-    try:
-        datetime.strptime(datetime_str, '%Y-%m-%d %H:%M:%S')
-    except ValueError:
-        raise ValueError("Incorrect data format, should be YYYY-MM-DD %H:%M:%S")
-
-
-def timefn(func):
-    '''用于函数运行时间测量的装饰器'''
-    @wraps(func)
-    def measure_time(*args, **kwargs):
-        start = time.time()
-        result = func(*args, **kwargs)
-        end = time.time()
-        print(
-            '{} TIME COST: {} took: {:.5f} seconds.'.format(
-                str(datetime.now())[:-4], func.__name__, end - start
-            )
-        )
-        return result
-    return measure_time
 
 
 def collect_cpu_info():
@@ -210,47 +178,12 @@ def collect_system_hardware_level_info(**kwargs):
     return system_stats_dict
 
 
-def initial_local_environment():
-    '''初始化数据库本地环境'''
-    if 'system_logs_database' not in os.listdir():
-        os.mkdir('system_logs_database')
-
-
-def query_system_info(start_time, end_time):
-    '''查询sys_info.db中start_time到end_time时间范围的系统基础信息'''
-    check_datetime_format(start_time)
-    check_datetime_format(end_time)
-    database_name_tmp = os.path.join(DATABASE_DIR, DATABASE_NAME)
-
-    with sqlite3.connect(database_name_tmp) as conn:
-        cursor = conn.cursor()
-
-        # 提取表头
-        cursor.execute(
-            'SELECT * FROM {} LIMIT 1'.format(TABLE_NAME)
-        )
-        col_name_list = [item[0] for item in cursor.description]
-
-        # 组装SQL Query语句
-        query_res = "SELECT * FROM {} WHERE {}.collect_datetime BETWEEN '{}' AND '{}';".format(
-            TABLE_NAME, TABLE_NAME, start_time, end_time
-        )
-
-        # 执行查询语句
-        sys_logs = cursor.execute(query_res)
-
-        query_res = [item for item in list(sys_logs)]
-        query_df = pd.DataFrame(query_res, columns=col_name_list)
-        query_df.drop(['index'], axis=1, inplace=True)
-
-    return query_df
-
-
 if __name__ == '__main__':
     # 初始化本地环境
     # **********************
-    initial_local_environment()
-    database_name = os.path.join(DATABASE_DIR, DATABASE_NAME)
+    database_name = os.path.join(
+        Configs.DATABASE_DIR, Configs.DATABASE_NAME
+    )
 
     system_info_dict = collect_system_hardware_level_info()
     system_info_dict_keys = list(system_info_dict.keys())
@@ -268,10 +201,10 @@ if __name__ == '__main__':
             )
 
             system_info_df.to_sql(
-                TABLE_NAME, con=conn, if_exists='append'
+                Configs.TABLE_NAME, con=conn, if_exists='append'
             )
 
-            time.sleep(COLLECT_SYS_INFO_EVERY_K_SECONDS)
+            time.sleep(Configs.COLLECT_SYSTEM_INFO_EVERY_K_SECONDS)
 
         cursor.close()
         conn.commit()
