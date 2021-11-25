@@ -59,10 +59,10 @@ def collect_cpu_info():
 
     # 获取cpu的使用情况
     cpu_usage_stats = psutil.cpu_percent(percpu=True, interval=1)
-    cpu_stats_dict['usage-25'] = np.quantile(cpu_usage_stats, 0.25)
-    cpu_stats_dict['usage-50'] = np.quantile(cpu_usage_stats, 0.5)
-    cpu_stats_dict['usage-75'] = np.quantile(cpu_usage_stats, 0.75)
-    cpu_stats_dict['usage-mean'] = np.mean(cpu_usage_stats)
+    cpu_stats_dict['usage_mean'] = np.mean(cpu_usage_stats)
+
+    for i in range(cpu_stats_dict['n_logical_cores']):
+        cpu_stats_dict['logical_core_{}'.format(i)] = cpu_usage_stats[i]
 
     # 为key添加标识符
     cpu_stats_dict = add_prefix(cpu_stats_dict, 'cpu')
@@ -76,8 +76,8 @@ def collect_network_info():
     net_io = psutil.net_io_counters()
 
     # network收发量
-    network_stats_dict['mb-sent'] = net_io.bytes_sent / 1024**2
-    network_stats_dict['mb-receive'] = net_io.bytes_recv / 1024**2
+    network_stats_dict['sent_mb'] = net_io.bytes_sent / 1024**2
+    network_stats_dict['receive_mb'] = net_io.bytes_recv / 1024**2
 
     # 为key添加标识符
     network_stats_dict = add_prefix(network_stats_dict, 'network')
@@ -92,52 +92,53 @@ def collect_memory_info():
     swap_info = psutil.swap_memory()
 
     # 内存信息保存
-    memory_stats_dict['total_system_memory'] = memory_info.total / 1024**2
-    memory_stats_dict['available_system_memory'] = memory_info.available / 1024**2
-    memory_stats_dict['used_system_memory'] = memory_info.used / 1024**2
-    memory_stats_dict['free_system_memory'] = memory_info.free / 1024**2
+    memory_stats_dict['total_system_memory_mb'] = memory_info.total / 1024**2
+    memory_stats_dict['available_system_memory_mb'] = memory_info.available / 1024**2
+    memory_stats_dict['used_system_memory_mb'] = memory_info.used / 1024**2
+    memory_stats_dict['free_system_memory_mb'] = memory_info.free / 1024**2
 
     # swap信息保存
-    memory_stats_dict['used_system_swap'] = swap_info.total / 1024**2
-    memory_stats_dict['used_system_swap'] = swap_info.used / 1024**2
-    memory_stats_dict['free_system_swap'] = swap_info.free / 1024**2
+    memory_stats_dict['used_system_swap_mb'] = swap_info.total / 1024**2
+    memory_stats_dict['used_system_swap_mb'] = swap_info.used / 1024**2
+    memory_stats_dict['free_system_swap_mb'] = swap_info.free / 1024**2
 
     return memory_stats_dict
 
 
-def collect_gpu_info(gpu_id=None):
-    '''搜集指定ID的GPU的使用率、显存使用率'''
-    if gpu_id is None:
-        gpu_id = 0
-
+def collect_gpu_info():
+    '''搜集所有GPU的使用率、显存使用率'''
     gpu_stats_dict = {}
-    gpu_stats_dict['gpu_id'] = gpu_id
     pynvml.nvmlInit()
 
-    # 获取gpu实例
-    gpu_handle = pynvml.nvmlDeviceGetHandleByIndex(gpu_id)
-    gpu_use = pynvml.nvmlDeviceGetUtilizationRates(gpu_handle)
+    # 获取GPU设备数量
+    n_gpu_instances = pynvml.nvmlDeviceGetCount()
 
-    # 获取gpu使用率
-    gpu_stats_dict['core_use'] = gpu_use.gpu / 100
+    for gpu_id in range(n_gpu_instances):
 
-    # 获取gpu温度
-    gpu_stats_dict['temperature'] = pynvml.nvmlDeviceGetTemperature(
-        gpu_handle, pynvml.NVML_TEMPERATURE_GPU
-    )
+        # 获取gpu实例
+        gpu_handle = pynvml.nvmlDeviceGetHandleByIndex(gpu_id)
+        gpu_use = pynvml.nvmlDeviceGetUtilizationRates(gpu_handle)
 
-    # 获取gpu的显存占用
-    gpu_memory_usage = pynvml.nvmlDeviceGetMemoryInfo(gpu_handle)
-    gpu_stats_dict['memory_total'] = gpu_memory_usage.total / 1024**2
-    gpu_stats_dict['memory_used'] = gpu_memory_usage.used / 1024**2
-    gpu_stats_dict['memory_free'] = gpu_memory_usage.free / 1024**2
+        # 获取gpu使用率
+        gpu_stats_dict['id_{}_core_use_percent'.format(gpu_id)] = gpu_use.gpu / 100
 
-    # 获取gpu的功率使用
-    gpu_stats_dict['tdp'] = pynvml.nvmlDeviceGetEnforcedPowerLimit(gpu_handle) / 1000
-    gpu_stats_dict['power_use'] = pynvml.nvmlDeviceGetPowerUsage(gpu_handle) / 1000
+        # 获取gpu温度
+        gpu_stats_dict['id_{}temperature'.format(gpu_id)] = pynvml.nvmlDeviceGetTemperature(
+            gpu_handle, pynvml.NVML_TEMPERATURE_GPU
+        )
 
-    # 获取gpu的风扇使用率
-    gpu_stats_dict['fan_use'] = pynvml.nvmlDeviceGetFanSpeed(gpu_handle)
+        # 获取gpu的显存占用
+        gpu_memory_usage = pynvml.nvmlDeviceGetMemoryInfo(gpu_handle)
+        gpu_stats_dict['id_{}_memory_total_mb'.format(gpu_id)] = gpu_memory_usage.total / 1024**2
+        gpu_stats_dict['id_{}_memory_used_mb'.format(gpu_id)] = gpu_memory_usage.used / 1024**2
+        gpu_stats_dict['id_{}_memory_free_mb'.format(gpu_id)] = gpu_memory_usage.free / 1024**2
+
+        # 获取gpu的功率使用
+        gpu_stats_dict['id_{}_tdp'.format(gpu_id)] = pynvml.nvmlDeviceGetEnforcedPowerLimit(gpu_handle) / 1000
+        gpu_stats_dict['id_{}_power_use'.format(gpu_id)] = pynvml.nvmlDeviceGetPowerUsage(gpu_handle) / 1000
+
+        # 获取gpu的风扇使用率
+        gpu_stats_dict['id_{}_fan_use_precent'.format(gpu_id)] = pynvml.nvmlDeviceGetFanSpeed(gpu_handle)
 
     pynvml.nvmlShutdown()
 
@@ -148,9 +149,8 @@ def collect_gpu_info(gpu_id=None):
 
 
 @timefn
-def collect_system_hardware_level_info(**kwargs):
+def collect_system_hardware_level_info():
     '''全面搜集系统层面的资源消耗情况'''
-    gpu_id = kwargs.pop('gpu_id', 0)
     system_stats_dict = {
         'collect_datetime': str(datetime.now())
     }
@@ -167,7 +167,7 @@ def collect_system_hardware_level_info(**kwargs):
 
     # 系统GPU信息
     system_stats_dict = {
-        **system_stats_dict, **collect_gpu_info(gpu_id)
+        **system_stats_dict, **collect_gpu_info()
     }
 
     # 系统Network信息
@@ -205,6 +205,3 @@ if __name__ == '__main__':
             )
 
             time.sleep(Configs.COLLECT_SYSTEM_INFO_EVERY_K_SECONDS)
-
-        cursor.close()
-        conn.commit()

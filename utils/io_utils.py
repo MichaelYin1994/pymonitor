@@ -49,6 +49,7 @@ def timefn(func):
         return result
     return measure_time
 
+
 def initial_local_environment():
     '''初始化数据库本地环境'''
     if 'system_logs_database' not in os.listdir():
@@ -64,7 +65,7 @@ def query_system_info(start_time, end_time, **kwargs):
     database_name = kwargs.pop('database_name', Configs.DATABASE_NAME)
     table_name = kwargs.pop('database_name', Configs.TABLE_NAME)
 
-    database_name_tmp = os.path.join(database_dir, database_name)
+    database_name_tmp = os.path.join('./', database_dir, database_name)
 
     with sqlite3.connect(database_name_tmp) as conn:
         cursor = conn.cursor()
