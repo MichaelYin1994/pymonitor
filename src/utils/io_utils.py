@@ -20,7 +20,7 @@ from datetime import datetime
 from functools import wraps
 
 import pandas as pd
-from config import Configs
+from src.config import Configs
 
 
 def check_datetime_format(datetime_str):

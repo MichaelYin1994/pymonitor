@@ -26,7 +26,7 @@ import pandas as pd
 import psutil
 import pynvml
 
-from config import Configs
+from src.config import Configs
 from utils.io_utils import timefn
 
 def add_prefix(info_dict, prefix=None):
